@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sentinel — Policy Approval Workflow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --bg: #EEF1F6;
+    --surface: #FFFFFF;
+    --surface-2: #F7F9FC;
+    --ink: #141A24;
+    --muted: #5C6675;
+    --faint: #8A93A2;
+    --border: #E1E6EE;
+    --border-strong: #CDD4DF;
+    --brand: #1B2433;
+    --indigo: #4F46E5;
+    --indigo-soft: #EEF0FE;
+    --approve: #15803D;
+    --approve-soft: #E7F4EC;
+    --reject: #C0362C;
+    --reject-soft: #FBEBE9;
+    --pending: #9A6B00;
+    --pending-soft: #FBF1DC;
+    --shadow: 0 1px 2px rgba(20,26,36,.04), 0 8px 24px rgba(20,26,36,.06);
+    --shadow-lg: 0 24px 60px rgba(20,26,36,.18);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.45;
+  }
+  #root { min-height: 100%; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-feature-settings: "tnum" 1; }
+
+  /* ---------- Login ---------- */
+  .login-wrap {
+    min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    background:
+      radial-gradient(1200px 500px at 100% -10%, #DDE3FF 0%, transparent 55%),
+      radial-gradient(900px 600px at -10% 110%, #E7ECF6 0%, transparent 50%),
+      var(--bg);
+  }
+  .login-card {
+    width: 100%; max-width: 420px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 18px;
+    box-shadow: var(--shadow-lg); overflow: hidden;
+  }
+  .login-head { padding: 32px 32px 24px; border-bottom: 1px solid var(--border); }
+  .brandmark { display: flex; align-items: center; gap: 11px; margin-bottom: 22px; }
+  .brand-dot {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--brand);
+    display: grid; place-items: center; color: #fff; flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+  }
+  .brand-dot svg { width: 17px; height: 17px; }
+  .brand-name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+  .brand-name span { color: var(--faint); font-weight: 500; }
+  .login-title {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px;
+    letter-spacing: -0.015em; line-height: 1.15; margin-bottom: 6px;
+  }
+  .login-sub { color: var(--muted); font-size: 13.5px; }
+  .login-body { padding: 24px 32px 32px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 7px; letter-spacing: .01em; }
+  .select, .input {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--border-strong);
+    border-radius: 10px; font-size: 14px; font-family: inherit; color: var(--ink);
+    background: var(--surface); transition: border-color .15s, box-shadow .15s;
+  }
+  .select:focus, .input:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-soft); }
+  .btn {
+    width: 100%; padding: 12px 16px; border: none; border-radius: 10px;
+    background: var(--brand); color: #fff; font-size: 14px; font-weight: 600;
+    font-family: inherit; cursor: pointer; transition: transform .08s, background .15s;
+  }
+  .btn:hover { background: #28344A; }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .login-hint { margin-top: 18px; font-size: 12px; color: var(--faint); text-align: center; line-height: 1.6; }
+  .login-hint code { font-family: 'JetBrains Mono', monospace; color: var(--muted); background: var(--surface-2); padding: 1px 6px; border-radius: 5px; }
+  .login-error { color: var(--reject); font-size: 12.5px; margin-top: -6px; margin-bottom: 14px; font-weight: 500; }
+
+  /* ---------- App shell ---------- */
+  .shell { min-height: 100vh; display: flex; flex-direction: column; }
+  .topbar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 24px; height: 60px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 20;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 13px; }
+  .topbar .brand-name { font-size: 14.5px; }
+  .who { display: flex; align-items: center; gap: 12px; }
+  .who-meta { text-align: right; line-height: 1.25; }
+  .who-email { font-size: 13px; font-weight: 600; }
+  .who-role { font-size: 11.5px; color: var(--muted); }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 9px; background: var(--indigo-soft);
+    color: var(--indigo); display: grid; place-items: center; font-weight: 700; font-size: 13px;
+  }
+  .logout { background: none; border: 1px solid var(--border-strong); color: var(--muted);
+    padding: 7px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .logout:hover { background: var(--surface-2); color: var(--ink); }
+
+  .main { max-width: 1180px; width: 100%; margin: 0 auto; padding: 28px 24px 60px; }
+
+  /* clearance banner */
+  .clearance {
+    display: flex; align-items: center; gap: 14px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px;
+    margin-bottom: 24px; box-shadow: var(--shadow);
+  }
+  .clearance-stamp {
+    flex-shrink: 0; width: 46px; height: 46px; border-radius: 10px;
+    background: var(--brand); color: #fff; display: grid; place-items: center;
+  }
+  .clearance-stamp svg { width: 22px; height: 22px; }
+  .clearance-text h2 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+  .clearance-text p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .clearance-limit { margin-left: auto; text-align: right; }
+  .clearance-limit .lbl { font-size: 11px; color: var(--faint); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+  .clearance-limit .val { font-size: 19px; font-weight: 600; letter-spacing: -.01em; margin-top: 1px; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab {
+    background: none; border: none; padding: 10px 14px 13px; font-size: 13.5px; font-weight: 600;
+    color: var(--muted); cursor: pointer; font-family: inherit; position: relative; transition: color .15s;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--ink); }
+  .tab.active::after {
+    content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px;
+    background: var(--brand); border-radius: 2px;
+  }
+  .tab .badge { margin-left: 7px; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 1px 7px; font-size: 11px; color: var(--muted); }
+
+  /* toolbar */
+  .toolbar { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .search { position: relative; flex: 1; min-width: 220px; }
+  .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--faint); }
+  .search input { width: 100%; padding: 10px 12px 10px 36px; border: 1px solid var(--border-strong);
+    border-radius: 10px; font-size: 13.5px; font-family: inherit; background: var(--surface); }
+  .search input:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-soft); }
+  .filters { display: flex; gap: 6px; }
+  .chip {
+    padding: 9px 14px; border: 1px solid var(--border-strong); background: var(--surface);
+    border-radius: 10px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+    cursor: pointer; font-family: inherit; transition: all .12s; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--faint); color: var(--ink); }
+  .chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  /* task grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px;
+  }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .card-title { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+  .card-id { font-size: 11.5px; color: var(--faint); margin-top: 3px; }
+  .amount { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+  .amount-row { display: flex; align-items: baseline; justify-content: space-between; }
+  .status {
+    font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  }
+  .status.PENDING { background: var(--pending-soft); color: var(--pending); }
+  .status.APPROVED { background: var(--approve-soft); color: var(--approve); }
+  .status.REJECTED { background: var(--reject-soft); color: var(--reject); }
+  .card-foot { display: flex; gap: 8px; align-items: center; }
+  .approve-btn {
+    flex: 1; padding: 9px; border: 1px solid var(--border-strong); background: var(--surface);
+    border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer;
+    font-family: inherit; transition: all .12s; display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .approve-btn:hover:not(:disabled) { border-color: var(--brand); background: var(--brand); color: #fff; }
+  .approve-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .approve-btn svg { width: 14px; height: 14px; }
+  .resolved-note { font-size: 12px; color: var(--faint); padding: 9px 0; text-align: center; flex: 1; font-weight: 500; }
+
+  /* policies + audit tables */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 11px; font-weight: 700; color: var(--faint); text-transform: uppercase;
+    letter-spacing: .05em; padding: 13px 18px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+  tbody td { padding: 14px 18px; font-size: 13.5px; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  .role-pill { display: inline-block; padding: 3px 10px; border-radius: 6px; background: var(--indigo-soft);
+    color: var(--indigo); font-size: 12px; font-weight: 600; text-transform: capitalize; }
+  .audit-row { display: flex; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; background: var(--faint); }
+  .audit-dot.approve { background: var(--approve); }
+  .audit-dot.reject { background: var(--reject); }
+  .audit-body { flex: 1; }
+  .audit-action { font-size: 13.5px; line-height: 1.4; }
+  .audit-time { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+  .empty { padding: 48px 20px; text-align: center; color: var(--faint); font-size: 13.5px; }
+
+  /* decision toast */
+  .toast-wrap { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 50; width: calc(100% - 48px); max-width: 440px; }
+  .toast {
+    border-radius: 13px; padding: 15px 18px; box-shadow: var(--shadow-lg); display: flex; gap: 13px;
+    align-items: flex-start; animation: rise .28s cubic-bezier(.16,1,.3,1); border: 1px solid;
+  }
+  .toast.approve { background: var(--approve-soft); border-color: #BFE3CC; }
+  .toast.reject { background: var(--reject-soft); border-color: #F2C9C4; }
+  .toast-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: #fff; }
+  .toast.approve .toast-icon { background: var(--approve); }
+  .toast.reject .toast-icon { background: var(--reject); }
+  .toast-icon svg { width: 18px; height: 18px; }
+  .toast-title { font-size: 13.5px; font-weight: 700; }
+  .toast.approve .toast-title { color: var(--approve); }
+  .toast.reject .toast-title { color: var(--reject); }
+  .toast-msg { font-size: 12.5px; color: var(--ink); margin-top: 2px; line-height: 1.4; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 560px) {
+    .clearance-limit { display: none; }
+    .main { padding: 20px 16px 50px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useMemo, useCallback } = React;
+
+/* ============================================================
+   SEED DATA  — mirrors the backend seed.js (Prisma/PostgreSQL).
+   In production this comes from the Express + Prisma REST API.
+   ============================================================ */
+const SEED_POLICIES = [
+  { id: 1, role: 'employee', maxAmount: 500 },
+  { id: 2, role: 'manager',  maxAmount: 5000 },
+  { id: 3, role: 'director', maxAmount: 50000 },
+  { id: 4, role: 'ceo',      maxAmount: 1000000 },
+];
+
+// Demo credentials. In production, passwords are hashed and verified
+// server-side, and a session/JWT is issued on login.
+const SEED_USERS = [
+  { id: 1, email: 'john@company.com',  role: 'employee', password: 'demo123', name: 'John Reyes' },
+  { id: 2, email: 'sarah@company.com', role: 'manager',  password: 'demo123', name: 'Sarah Okafor' },
+  { id: 3, email: 'mike@company.com',  role: 'director', password: 'demo123', name: 'Mike Tran' },
+  { id: 4, email: 'ceo@company.com',   role: 'ceo',      password: 'demo123', name: 'Dana Cole' },
+];
+
+const SEED_TASKS = [
+  { id: 1,  title: 'Office supplies purchase',       amount: 250,    status: 'PENDING' },
+  { id: 2,  title: 'Team lunch expense',             amount: 450,    status: 'PENDING' },
+  { id: 3,  title: 'New laptop for developer',       amount: 2500,   status: 'PENDING' },
+  { id: 4,  title: 'Conference tickets (team of 3)', amount: 4200,   status: 'PENDING' },
+  { id: 5,  title: 'Q1 marketing campaign',          amount: 25000,  status: 'PENDING' },
+  { id: 6,  title: 'Hire 2 senior engineers',        amount: 45000,  status: 'PENDING' },
+  { id: 7,  title: 'Acquire competitor company',     amount: 500000, status: 'PENDING' },
+  { id: 8,  title: 'Open new office location',       amount: 250000, status: 'PENDING' },
+  { id: 9,  title: 'Software licenses renewal',      amount: 1200,   status: 'APPROVED' },
+  { id: 10, title: 'Emergency server repair',        amount: 8000,   status: 'APPROVED' },
+];
+
+const SEED_AUDIT = [
+  { id: 1, action: 'Task approved by manager: "Software licenses renewal"', kind: 'approve', timestamp: '2026-06-10T14:22:00' },
+  { id: 2, action: 'Task approved by director: "Emergency server repair"',  kind: 'approve', timestamp: '2026-06-10T15:03:00' },
+];
+
+/* ============================================================
+   POLICY ENGINE  — same rule as backend services/policyEngine.js:
+   a role may approve a task only if amount <= its policy maxAmount.
+   ============================================================ */
+function canApprove(role, amount, policies) {
+  const policy = policies.find(p => p.role === role);
+  if (!policy) return { allowed: false, reason: `No policy found for role: ${role}` };
+  const allowed = amount <= policy.maxAmount;
+  return {
+    allowed,
+    reason: allowed
+      ? `Approved — ${role} clearance covers ${fmt(amount)}.`
+      : `Rejected — ${role} clearance caps at ${fmt(policy.maxAmount)}, this needs ${fmt(amount)}.`,
+  };
+}
+
+const fmt = n => '$' + n.toLocaleString('en-US');
+const timeAgo = iso => {
+  const d = new Date(iso);
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+};
+
+/* ---------- icons ---------- */
+const IShield = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+const ICheck = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+const IX = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const ISearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+function Login({ onLogin }) {
+  const [email, setEmail] = useState('sarah@company.com');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = () => {
+    const user = SEED_USERS.find(u => u.email === email.trim().toLowerCase());
+    if (!user || user.password !== password) {
+      setError('Incorrect email or password.');
+      return;
+    }
+    setError('');
+    onLogin(user);
+  };
+
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-head">
+          <div className="brandmark">
+            <div className="brand-dot"><IShield /></div>
+            <div className="brand-name">Sentinel <span>/ Approvals</span></div>
+          </div>
+          <h1 className="login-title">Sign in to your workspace</h1>
+          <p className="login-sub">Spending approvals, governed by role-based policy.</p>
+        </div>
+        <div className="login-body">
+          <div className="field">
+            <label>Work email</label>
+            <select className="select" value={email} onChange={e => { setEmail(e.target.value); setError(''); }}>
+              {SEED_USERS.map(u => <option key={u.id} value={u.email}>{u.email} — {u.role}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>Password</label>
+            <input className="input" type="password" value={password} placeholder="••••••••"
+              onChange={e => { setPassword(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && submit()} />
+          </div>
+          {error && <div className="login-error">{error}</div>}
+          <button className="btn" onClick={submit}>Sign in</button>
+          <div className="login-hint">Demo password for every account: <code>demo123</code><br/>Each role carries a different approval limit.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   MAIN APP
+   ============================================================ */
+function App() {
+  const [user, setUser] = useState(null);
+  const [tasks, setTasks] = useState(SEED_TASKS);
+  const [audit, setAudit] = useState(SEED_AUDIT);
+  const [policies] = useState(SEED_POLICIES);
+  const [tab, setTab] = useState('tasks');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('ALL');
+  const [toast, setToast] = useState(null);
+
+  const myPolicy = user ? policies.find(p => p.role === user.role) : null;
+
+  const showToast = useCallback((t) => {
+    setToast(t);
+    setTimeout(() => setToast(null), 4200);
+  }, []);
+
+  const handleApprove = (task) => {
+    const result = canApprove(user.role, task.amount, policies);
+    const newStatus = result.allowed ? 'APPROVED' : 'REJECTED';
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+    const entry = {
+      id: Date.now(),
+      action: result.allowed
+        ? `Task approved by ${user.role}: "${task.title}"`
+        : `Approval blocked — ${user.role} lacked authority for "${task.title}"`,
+      kind: result.allowed ? 'approve' : 'reject',
+      timestamp: new Date().toISOString(),
+    };
+    setAudit(prev => [entry, ...prev]);
+    showToast({ kind: result.allowed ? 'approve' : 'reject',
+      title: result.allowed ? 'Approved' : 'Rejected',
+      msg: result.reason });
+  };
+
+  const visibleTasks = useMemo(() => {
+    return tasks.filter(t => {
+      const matchQ = t.title.toLowerCase().includes(query.toLowerCase());
+      const matchF = filter === 'ALL' || t.status === filter;
+      return matchQ && matchF;
+    });
+  }, [tasks, query, filter]);
+
+  const counts = useMemo(() => ({
+    ALL: tasks.length,
+    PENDING: tasks.filter(t => t.status === 'PENDING').length,
+    APPROVED: tasks.filter(t => t.status === 'APPROVED').length,
+    REJECTED: tasks.filter(t => t.status === 'REJECTED').length,
+  }), [tasks]);
+
+  if (!user) return <Login onLogin={setUser} />;
+
+  return (
+    <div className="shell">
+      <header className="topbar">
+        <div className="topbar-left">
+          <div className="brand-dot"><IShield /></div>
+          <div className="brand-name">Sentinel <span>/ Approvals</span></div>
+        </div>
+        <div className="who">
+          <div className="who-meta">
+            <div className="who-email">{user.name}</div>
+            <div className="who-role">{user.email}</div>
+          </div>
+          <div className="avatar">{user.name.split(' ').map(p => p[0]).join('')}</div>
+          <button className="logout" onClick={() => { setUser(null); }}>Sign out</button>
+        </div>
+      </header>
+
+      <div className="main">
+        <div className="clearance">
+          <div className="clearance-stamp"><IShield /></div>
+          <div className="clearance-text">
+            <h2>Signed in as <span className="role-pill">{user.role}</span></h2>
+            <p>Policy engine authorizes your approvals up to your role's ceiling.</p>
+          </div>
+          <div className="clearance-limit">
+            <div className="lbl">Approval limit</div>
+            <div className="val mono">{fmt(myPolicy.maxAmount)}</div>
+          </div>
+        </div>
+
+        <div className="tabs">
+          <button className={`tab ${tab==='tasks'?'active':''}`} onClick={()=>setTab('tasks')}>Tasks <span className="badge">{counts.ALL}</span></button>
+          <button className={`tab ${tab==='policies'?'active':''}`} onClick={()=>setTab('policies')}>Policies <span className="badge">{policies.length}</span></button>
+          <button className={`tab ${tab==='audit'?'active':''}`} onClick={()=>setTab('audit')}>Audit log <span className="badge">{audit.length}</span></button>
+        </div>
+
+        {tab === 'tasks' && (
+          <>
+            <div className="toolbar">
+              <div className="search">
+                <ISearch />
+                <input placeholder="Search tasks by name…" value={query} onChange={e=>setQuery(e.target.value)} />
+              </div>
+              <div className="filters">
+                {['ALL','PENDING','APPROVED','REJECTED'].map(f => (
+                  <button key={f} className={`chip ${filter===f?'on':''}`} onClick={()=>setFilter(f)}>
+                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {visibleTasks.length === 0 ? (
+              <div className="panel"><div className="empty">No tasks match your search or filter.</div></div>
+            ) : (
+              <div className="grid">
+                {visibleTasks.map(task => {
+                  const eligible = task.status === 'PENDING' && task.amount <= myPolicy.maxAmount;
+                  return (
+                    <div className="card" key={task.id}>
+                      <div className="card-top">
+                        <div>
+                          <div className="card-title">{task.title}</div>
+                          <div className="card-id">Request #{String(task.id).padStart(4,'0')}</div>
+                        </div>
+                        <span className={`status ${task.status}`}>{task.status}</span>
+                      </div>
+                      <div className="amount-row">
+                        <span className="amount mono">{fmt(task.amount)}</span>
+                      </div>
+                      <div className="card-foot">
+                        {task.status === 'PENDING' ? (
+                          <button className="approve-btn" onClick={()=>handleApprove(task)}
+                            title={eligible ? 'Within your approval limit' : 'Exceeds your limit — will be rejected'}>
+                            <ICheck /> Review &amp; decide
+                          </button>
+                        ) : (
+                          <div className="resolved-note">
+                            {task.status === 'APPROVED' ? 'Approved' : 'Rejected'} · no further action
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === 'policies' && (
+          <div className="panel">
+            <table>
+              <thead><tr><th>Role</th><th>Approval ceiling</th><th>Scope</th></tr></thead>
+              <tbody>
+                {policies.map(p => (
+                  <tr key={p.id}>
+                    <td><span className="role-pill">{p.role}</span></td>
+                    <td className="mono" style={{fontWeight:600}}>{fmt(p.maxAmount)}</td>
+                    <td style={{color:'var(--muted)'}}>
+                      {p.role === user.role ? 'Your current clearance' : 'Other role'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {tab === 'audit' && (
+          <div className="panel">
+            {audit.length === 0 ? <div className="empty">No activity recorded yet.</div> :
+              audit.map(a => (
+                <div className="audit-row" key={a.id}>
+                  <div className={`audit-dot ${a.kind || ''}`}></div>
+                  <div className="audit-body">
+                    <div className="audit-action">{a.action}</div>
+                    <div className="audit-time mono">{timeAgo(a.timestamp)}</div>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        )}
+      </div>
+
+      {toast && (
+        <div className="toast-wrap">
+          <div className={`toast ${toast.kind}`}>
+            <div className="toast-icon">{toast.kind === 'approve' ? <ICheck/> : <IX/>}</div>
+            <div>
+              <div className="toast-title">{toast.title}</div>
+              <div className="toast-msg">{toast.msg}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

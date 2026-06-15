@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id    Int    @id @default(autoincrement())
+  email String @unique
+  role  String
+}
+
+model Task {
+  id         Int      @id @default(autoincrement())
+  title      String
+  status     String
+  amount     Int
+  createdAt DateTime @default(now())
+}
+
+model Policy {
+  id        Int     @id @default(autoincrement())
+  role      String
+  maxAmount Int
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  entityId  Int
+  timestamp DateTime @default(now())
+}
